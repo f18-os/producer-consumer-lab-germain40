@@ -33,6 +33,20 @@ def extractFrames(fileName, outputBuffer):
 
     print("Frame extraction complete")
 
+def convertFrames(inputBuffer, outputBuffer):
+    count = 0
+    while not inputBuffer.empty():
+        frameAsText = inputBuffer.get()
+        jpgRawImage = base64.b64decode(frameAsText)
+        jpgImage = np.asarray(bytearray(jpgRawImage), dtype=np.uint8)
+        img = cv2.imdecode(jpgImage, cv2.IMREAD_UNCHANGED)
+        gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        success, jpgImage = cv2.imencode('.jpg', gray_img) 
+        jpgAsText = base64.b64encode(jpgImage)
+        outputBuffer.put(jpgAsText)
+        print('Converting Frame {}'.format(count))
+        count += 1
+    print("Conversion complete")
 
 def displayFrames(inputBuffer):
     # initialize frame count
@@ -71,10 +85,12 @@ filename = 'clip.mp4'
 
 # shared queue  
 extractionQueue = queue.Queue()
+convertQueue = queue.Queue()
 
 # extract the frames
 extractFrames(filename,extractionQueue)
-
+# convert frames
+convertFrames(extractionQueue, convertQueue)
 # display the frames
-displayFrames(extractionQueue)
+displayFrames(convertQueue)
 
