@@ -27,22 +27,20 @@ Loads a series of frames sequently from files with the names
 Loads a series of framss from a video contained in 'clip.mp4' and displays 
 them with a 42ms delay
 
-## Requirements
+## What is does 
 * Extract frames from a video file, convert them to grayscale, and display
 them in sequence
-* You must have three functions
+* Has three functions
   * One function to extract the frames
   * One function to convert the frames to grayscale
   * One function to display the frames at the original framerate (24fps)
-* The functions must each execute within their own python thread
+* The functions execute within their own python thread
   * The threads will execute concurrently
   * The order threads execute in may not be the same from run to run
 * Threads will need to signal that they have completed their task
 * Threads must process all frames of the video exactly once
-* Frames will be communicated between threads using producer/consumer idioms
-  * Producer/consumer quesues will be bounded at ten frames
-
-Note: You may have ancillary objects and method in order to make you're code easer to understand and implement.
+* Frames communicated between threads using producer/consumer idioms
+  * Producer/consumer quesues are bounded at ten frames
 
 
 
