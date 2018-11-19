@@ -6,6 +6,21 @@ import numpy as np
 import base64
 import queue
 
+class Q:
+    def __init__(self, initArray = []):
+        self.a = []
+        self.a = [x for x in initArray]
+    def put(self, item):
+        self.a.append(item)
+    def get(self):
+        a = self.a
+        item = a[0]
+        del a[0]
+        return item
+    def __repr__(self):
+        return "Q(%s)" % self.a
+
+
 def extractFrames(fileName, outputBuffer):
     # Initialize frame count 
     count = 0
@@ -24,8 +39,10 @@ def extractFrames(fileName, outputBuffer):
         #encode the frame as base 64 to make debugging easier
         jpgAsText = base64.b64encode(jpgImage)
 
-        # add the frame to the buffer
+        # add the frame to the buffer and use semaphores
+        empty_Count.acquire()
         outputBuffer.put(jpgAsText)
+        fill_Count.release()
        
         success,image = vidcap.read()
         print('Reading frame {} {}'.format(count, success))
@@ -33,17 +50,26 @@ def extractFrames(fileName, outputBuffer):
 
     print("Frame extraction complete")
 
-def convertFrames(inputBuffer, outputBuffer):
+def convert(inputBuffer, outputBuffer):
     count = 0
-    while not inputBuffer.empty():
+    while True:
+        # get and use semaphores from extraction
+        fill_Count.acquire()
         frameAsText = inputBuffer.get()
+        empty_Count.release()
+
         jpgRawImage = base64.b64decode(frameAsText)
         jpgImage = np.asarray(bytearray(jpgRawImage), dtype=np.uint8)
         img = cv2.imdecode(jpgImage, cv2.IMREAD_UNCHANGED)
         gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         success, jpgImage = cv2.imencode('.jpg', gray_img) 
         jpgAsText = base64.b64encode(jpgImage)
+
+        # put and use semaphores for conversion
+        empty_Count2.acquire()
         outputBuffer.put(jpgAsText)
+        fill_Count2.release()
+
         print('Converting Frame {}'.format(count))
         count += 1
     print("Conversion complete")
@@ -53,9 +79,11 @@ def displayFrames(inputBuffer):
     count = 0
 
     # go through each frame in the buffer until the buffer is empty
-    while not inputBuffer.empty():
-        # get the next frame
+    while True:
+        # get the next frame and use semaphores for conversion
+        fill_Count2.acquire()
         frameAsText = inputBuffer.get()
+        empty_Count2.release()
 
         # decode the frame 
         jpgRawImage = base64.b64decode(frameAsText)
@@ -83,14 +111,29 @@ def displayFrames(inputBuffer):
 # filename of clip to load
 filename = 'clip.mp4'
 
+buf = 10
+# extractionQueue semaphores!
+fill_Count = threading.Semaphore(0)
+empty_Count = threading.Semaphore(buf)
+
+# convertQueue semaphores!
+fill_Count2 = threading.Semaphore(0)
+empty_Count2 = threading.Semaphore(buf)
+
 # shared queue  
-extractionQueue = queue.Queue()
-convertQueue = queue.Queue()
+extractionQueue = Q()
+convertQueue = Q()
 
 # extract the frames
-extractFrames(filename,extractionQueue)
+# extractFrames(filename,extractionQueue)
+ext = threading.Thread(target=extractFrames, args=(filename, extractionQueue))
 # convert frames
-convertFrames(extractionQueue, convertQueue)
+# convert(extractionQueue, convertQueue)
+con = threading.Thread(target=convert, args=(extractionQueue, convertQueue))
 # display the frames
-displayFrames(convertQueue)
+# displayFrames(convertQueue)
+dis = threading.Thread(target=displayFrames, args=(convertQueue,))
 
+ext.start()
+con.start()
+dis.start()
